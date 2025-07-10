@@ -1,4 +1,4 @@
-# 🤖 DobbySearch - CryptoGPT CLI Agent
+# 🤖 DobbySearch - Crypto CLI 
 
 **DobbySearch** is a Python-based intelligent CLI agent designed to search and analyze information related to the **crypto world** — combining live data from CoinGecko, real-time web results, and powerful AI explanations in either English or Indonesian.
 
