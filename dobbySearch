@@ -1,0 +1,167 @@
+#!/usr/bin/python3
+
+# installler
+import subprocess
+import sys
+
+def auto_install_and_import(module_name, import_as=None):
+    try:
+        return __import__(import_as or module_name)
+    except ModuleNotFoundError:
+        print(f"[⚠️] Modul '{module_name}' tidak ditemukan. Menginstal otomatis...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", module_name])
+        return __import__(import_as or module_name)
+
+
+# lib yang di install
+requests = auto_install_and_import("requests")
+bs4 = auto_install_and_import("bs4")
+rich = auto_install_and_import("rich")
+
+
+import argparse
+import time
+import json
+from modules.scraper import duckduckgo_multi_scrape
+from modules.analyzer import analyze_with_dobby
+from modules.gecko import CoinGeckoClient
+from rich import print
+from rich.panel import Panel
+from rich.console import Console
+import os
+import sys
+
+console = Console()
+
+def tampilkan_hasil_scrape(hasil):
+    for idx, item in enumerate(hasil, 1):
+        print(f"[bold blue]{idx}.[/bold blue] {item['link']} | [italic]{item['snippet']}[/italic]")
+
+def format_gecko_data_for_ai(data):
+    """Format data CoinGecko untuk analisis AI."""
+    formatted = []
+    for c in data:
+        formatted.append(
+            f"Token: {c['name']} ({c['symbol'].upper()})\n"
+            f"Harga: ${c.get('current_price', 0.0):,.6f}\n"
+            f"Market Cap: ${c.get('market_cap', 0.0):,.2f}\n"
+            f"Volume 24 Jam: ${c.get('total_volume', 0.0):,.2f}\n"
+            f"Perubahan Harga 24 Jam: {c.get('price_change_percentage_24h', 0.0):,.2f}%\n"
+            f"Suplai Beredar: {c.get('circulating_supply', 0.0):,.2f}\n"
+        )
+    return "\n".join(formatted)
+
+def filter_relevant_news(hasil_scrape, token_query):
+    """Filter berita untuk memastikan relevansi dengan proyek crypto."""
+    relevant = []
+    irrelevant_keywords = ["dictionary", "britannica", "merriam-webster", "wikipedia", "game", "card"]
+    for item in hasil_scrape:
+        is_relevant = True
+        for keyword in irrelevant_keywords:
+            if keyword in item['link'].lower() or keyword in item['snippet'].lower():
+                is_relevant = False
+                break
+        if is_relevant and token_query.lower() in item['snippet'].lower():
+            relevant.append(item)
+    return relevant
+
+def main():
+    parser = argparse.ArgumentParser(description="Hyra CryptoGPT CLI Agent")
+    parser.add_argument('--prompt', required=True, help='Topik crypto yang ingin dicari')
+    parser.add_argument('--web', default='true', choices=['true', 'false'], help='Gunakan pencarian web untuk berita')
+    parser.add_argument('--gecko', default='false', choices=['true', 'false'], help='Tampilkan harga dari CoinGecko')
+    parser.add_argument('--countsearch', type=int, default=5, help='Jumlah hasil pencarian')
+    parser.add_argument('--locksitus', type=str, default='', help='Filter situs (optional)')
+    parser.add_argument('--mode', choices=['ringkas', 'detail'], default='detail', help='Mode AI')
+    parser.add_argument('--crypto', default='false', choices=['true', 'false'], help='Mode khusus berita crypto')
+    parser.add_argument('--lang', default='id', choices=['id', 'en'], help='Bahasa output AI: id (Indonesia) atau en (Inggris)')
+
+    args = parser.parse_args()
+    query = args.prompt.strip()
+    use_web = args.web.lower() == 'true'
+    use_gecko = args.gecko.lower() == 'true'
+    jumlah = args.countsearch
+    locksite = args.locksitus.strip()
+    crypto_mode = args.crypto.lower() == 'true'
+    mode = args.mode
+    lang = args.lang.lower()
+
+    print("(INFO) [bold cyan]🤖GsentiShell Info AI CLI[/bold cyan]")
+    print(f"(INFO) [green]Prompt:[/green] {query}")
+    print(f"(INFO) [green]Bahasa:[/green] {'Indonesia' if lang == 'id' else 'English'}")
+
+    
+    token_query = query.lower().split(" harga")[0].strip() if "harga" in query.lower() else query.lower()
+
+    if crypto_mode:
+        query += " harga crypto hari ini OR berita crypto terbaru"
+        print("(INFO) [yellow]🪙 Mode Crypto Aktif[/yellow]")
+
+    hasil_scrape = []
+
+    
+    if use_web:
+        print(f"(INFO) [green]Web Crawling Aktif:[/green] ({jumlah} hasil)")
+        if locksite:
+            print(f"[green]Filter Situs:[/green] {locksite}")
+        print("(INFO) [white]🔎 Mencari berita lewat DuckDuckGo...[/white]")
+
+        full_query = f"{query} site:{locksite}" if locksite else query
+        try:
+            hasil_scrape = duckduckgo_multi_scrape(full_query, jumlah=jumlah, max_pages=2)
+            hasil_scrape = filter_relevant_news(hasil_scrape, token_query)
+            if not hasil_scrape:
+                print("[red]❌ Tidak ada berita relevan ditemukan[/red]")
+            else:
+                pass
+                #tampilkan_hasil_scrape(hasil_scrape)
+        except Exception as e:
+            print(f"[red]❌ Gagal scraping berita: {e}[/red]")
+
+    
+    gecko_data = []
+    if use_gecko:
+        gecko_client = CoinGeckoClient()
+        print(f"(INFO) [green]🔎 Mencari harga token: [bold yellow]{token_query}[/bold yellow]")
+        try:
+            ids = gecko_client.search_tokens(token_query)
+            if not ids:
+                print(f"[red]❌ Token '{token_query}' tidak ditemukan di CoinGecko.[/red]")
+            else:
+                print(f"(INFO) [green]✅ Ditemukan {len(ids)} token, mengambil detail...[/green]")
+                gecko_data = gecko_client.fetch_details(ids)
+                if not gecko_data:
+                    print("[red]❌ Gagal ambil data dari CoinGecko.[/red]")
+                else:
+                    gecko_data = gecko_client.display_table(gecko_data)
+                    #gecko_client.display_progress(gecko_data)  # Aktifkan jika ingin progress bar
+        except Exception as e:
+            print(f"[red]❌ Gagal mengambil data CoinGecko: {e}[/red]")
+
+    
+    print("(INFO) [green bold]🧠 Klarifikasi oleh Sentient Dobby AI...[reset]")
+    text_for_ai = f"Query: {query}\n\n"
+    
+    
+    if gecko_data:
+        text_for_ai += f"[yellow]Data Harga dari CoinGecko (Patokan Resmi):[/yellow]\n{format_gecko_data_for_ai(gecko_data)}\n\n"
+    
+    
+    if hasil_scrape:
+        text_for_ai += "[yellow]Berita dan Hype dari Web:[/yellow]\n" + "\n".join(
+            [f"{x['link']} | {x['snippet']}" for x in hasil_scrape]
+        )
+    else:
+        text_for_ai += "Tidak ada berita relevan dari web."
+
+    if mode == 'ringkas':
+        text_for_ai = f"Ringkas: {text_for_ai}"
+
+    try:
+        klarifikasi = analyze_with_dobby(text_for_ai, lang=lang)
+        print(Panel(klarifikasi, title="[bold green]📘 Penjelasan AI Dobby[/bold green]", highlight=True))
+    except Exception as e:
+        print(f"[red]❌ Gagal analisis dengan Dobby: {e}[/red]")
+
+if __name__ == "__main__":
+    main()
