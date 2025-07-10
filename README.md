@@ -29,6 +29,7 @@ python3 dobbySearch \
   --lang en
 ```
 ⚙️ CLI Options
+```
 Argument	Description
 --prompt	Topic to search and analyze (required)
 --web	Enable web search: true or false
@@ -38,6 +39,7 @@ Argument	Description
 --mode	AI response style: ringkas (concise) or detail
 --crypto	Enable crypto-specific mode (optional)
 --lang	Output language: id (Indonesian) or en (English)
+```
 
 🔐 Setting Up Fireworks API Key
 This tool requires a Fireworks AI API key to generate AI responses. The model used is:
