@@ -27,6 +27,7 @@ python3 dobbySearch \
   --countsearch 10 \
   --mode detail \
   --lang en
+```
 ⚙️ CLI Options
 Argument	Description
 --prompt	Topic to search and analyze (required)
@@ -45,8 +46,12 @@ sentientfoundation/models/dobby-unhinged-llama-3-70b-new
 
 🔸 How to Configure
 1. Export via terminal:
+```
 export FIREWORKS_API_KEY="your_api_key_here"
-
+```
 2. Or create a .env file:
+```
 FIREWORKS_API_KEY=your_api_key_here
-The system will automatically detect this key on runtime. Be sure .env is in the project root.
+```
+# example:
+![Screenshot_2025-07-08_00-25-25](https://github.com/user-attachments/assets/43a71f89-3cd9-4f30-b2fc-0d97d5297f45)
